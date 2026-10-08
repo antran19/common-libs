@@ -25,7 +25,7 @@ public class JwtTokenProvider {
         this.key = Keys.hmacShaKeyFor(properties.getSecret().getBytes(StandardCharsets.UTF_8));
     }
 
-    public String generateToken(String userId, String role, List<String> privileges) {
+    public String generateToken(String userId, String role, List<String> privileges, String trustLevel) {
         Instant now = Instant.now();
         Instant expiry = now.plusSeconds(properties.getExpirationMinutes() * 60);
 
@@ -33,6 +33,7 @@ public class JwtTokenProvider {
                 .subject(userId)
                 .claim("role", role)
                 .claim("privileges", privileges)
+                .claim("trustLevel", trustLevel)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiry))
                 .signWith(key)

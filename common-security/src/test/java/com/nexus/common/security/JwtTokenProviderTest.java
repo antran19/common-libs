@@ -24,24 +24,25 @@ class JwtTokenProviderTest {
 
     @Test
     void generateThenParse_roundTripsClaims() {
-        String token = provider.generateToken("user-1", "BUYER", List.of("AUTH.LOGIN", "PROFILE.VIEW"));
+        String token = provider.generateToken("user-1", "BUYER", List.of("AUTH.LOGIN", "PROFILE.VIEW"), "TRUSTED");
 
         Claims claims = provider.parseClaims(token);
 
         assertThat(claims.getSubject()).isEqualTo("user-1");
         assertThat(claims.get("role", String.class)).isEqualTo("BUYER");
         assertThat(claims.get("privileges", List.class)).containsExactly("AUTH.LOGIN", "PROFILE.VIEW");
+        assertThat(claims.get("trustLevel", String.class)).isEqualTo("TRUSTED");
     }
 
     @Test
     void isValid_returnsTrueForFreshToken() {
-        String token = provider.generateToken("user-1", "BUYER", List.of("AUTH.LOGIN"));
+        String token = provider.generateToken("user-1", "BUYER", List.of("AUTH.LOGIN"), "TRUSTED");
         assertThat(provider.isValid(token)).isTrue();
     }
 
     @Test
     void isValid_returnsFalseForTamperedToken() {
-        String token = provider.generateToken("user-1", "BUYER", List.of("AUTH.LOGIN"));
+        String token = provider.generateToken("user-1", "BUYER", List.of("AUTH.LOGIN"), "TRUSTED");
         String tampered = token.substring(0, token.length() - 2) + "xx";
         assertThat(provider.isValid(tampered)).isFalse();
     }
