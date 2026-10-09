@@ -35,6 +35,19 @@ class JwtTokenProviderTest {
     }
 
     @Test
+    void generateToken_assignsAUniqueJtiPerToken() {
+        String tokenA = provider.generateToken("user-1", "BUYER", List.of(), "TRUSTED");
+        String tokenB = provider.generateToken("user-1", "BUYER", List.of(), "TRUSTED");
+
+        String jtiA = provider.parseClaims(tokenA).get("jti", String.class);
+        String jtiB = provider.parseClaims(tokenB).get("jti", String.class);
+
+        assertThat(jtiA).isNotBlank();
+        assertThat(jtiB).isNotBlank();
+        assertThat(jtiA).isNotEqualTo(jtiB);
+    }
+
+    @Test
     void isValid_returnsTrueForFreshToken() {
         String token = provider.generateToken("user-1", "BUYER", List.of("AUTH.LOGIN"), "TRUSTED");
         assertThat(provider.isValid(token)).isTrue();

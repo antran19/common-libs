@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 
 @Component
 @EnableConfigurationProperties(JwtProperties.class)
@@ -31,6 +32,7 @@ public class JwtTokenProvider {
 
         return Jwts.builder()
                 .subject(userId)
+                .id(UUID.randomUUID().toString())
                 .claim("role", role)
                 .claim("privileges", privileges)
                 .claim("trustLevel", trustLevel)

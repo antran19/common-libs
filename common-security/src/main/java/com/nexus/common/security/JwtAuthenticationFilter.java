@@ -14,6 +14,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 
 // common-security is consumed by both servlet-based services (user-service,
 // catalog-service) and the reactive (WebFlux) api-gateway. This class extends a
@@ -36,9 +37,11 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final Optional<TokenBlacklistPort> tokenBlacklistPort;
 
-    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider) {
+    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider, Optional<TokenBlacklistPort> tokenBlacklistPort) {
         this.jwtTokenProvider = jwtTokenProvider;
+        this.tokenBlacklistPort = tokenBlacklistPort;
     }
 
     @Override
@@ -49,19 +52,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String token = header.substring(7);
             if (jwtTokenProvider.isValid(token)) {
                 Claims claims = jwtTokenProvider.parseClaims(token);
-                String userId = claims.getSubject();
-                @SuppressWarnings("unchecked")
-                List<String> privileges = claims.get("privileges", List.class);
-                List<SimpleGrantedAuthority> authorities = (privileges == null ? List.<String>of() : privileges)
-                        .stream().map(SimpleGrantedAuthority::new).toList();
+                if (!isBlacklisted(claims)) {
+                    String userId = claims.getSubject();
+                    @SuppressWarnings("unchecked")
+                    List<String> privileges = claims.get("privileges", List.class);
+                    List<SimpleGrantedAuthority> authorities = (privileges == null ? List.<String>of() : privileges)
+                            .stream().map(SimpleGrantedAuthority::new).toList();
 
-                UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(userId, null, authorities);
-                authToken.setDetails(new TokenDetails(claims.get("role", String.class),
-                        claims.get("trustLevel", String.class)));
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+                    UsernamePasswordAuthenticationToken authToken =
+                            new UsernamePasswordAuthenticationToken(userId, null, authorities);
+                    authToken.setDetails(new TokenDetails(claims.get("role", String.class),
+                            claims.get("trustLevel", String.class)));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
             }
         }
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isBlacklisted(Claims claims) {
+        return tokenBlacklistPort.map(port -> port.isBlacklisted(claims.get("jti", String.class))).orElse(false);
     }
 }
