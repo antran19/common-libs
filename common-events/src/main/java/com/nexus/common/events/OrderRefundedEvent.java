@@ -12,13 +12,15 @@ public class OrderRefundedEvent extends DomainEvent {
     private final String buyerId;
     private final BigDecimal amount;
     private final String reason;
+    private final boolean shipped;
 
-    public OrderRefundedEvent(String orderId, String buyerId, BigDecimal amount, String reason) {
+    public OrderRefundedEvent(String orderId, String buyerId, BigDecimal amount, String reason, boolean shipped) {
         super("OrderRefunded", orderId);
         this.orderId = orderId;
         this.buyerId = buyerId;
         this.amount = amount;
         this.reason = reason;
+        this.shipped = shipped;
     }
 
     @JsonCreator
@@ -30,16 +32,19 @@ public class OrderRefundedEvent extends DomainEvent {
             @JsonProperty("orderId") String orderId,
             @JsonProperty("buyerId") String buyerId,
             @JsonProperty("amount") BigDecimal amount,
-            @JsonProperty("reason") String reason) {
+            @JsonProperty("reason") String reason,
+            @JsonProperty("shipped") boolean shipped) {
         super(eventId, eventType, occurredAt, aggregateId);
         this.orderId = orderId;
         this.buyerId = buyerId;
         this.amount = amount;
         this.reason = reason;
+        this.shipped = shipped;
     }
 
     public String getOrderId() { return orderId; }
     public String getBuyerId() { return buyerId; }
     public BigDecimal getAmount() { return amount; }
     public String getReason() { return reason; }
+    public boolean isShipped() { return shipped; }
 }
