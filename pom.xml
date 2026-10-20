@@ -6,7 +6,7 @@
 
   <groupId>com.nexus</groupId>
   <artifactId>common-libs-parent</artifactId>
-  <version>1.14.0</version>
+  <version>1.15.0</version>
   <packaging>pom</packaging>
 
   <properties>
@@ -36,6 +36,7 @@
     <module>common-web</module>
     <module>common-events</module>
     <module>common-security</module>
+    <module>common-kafka</module>
   </modules>
 
   <distributionManagement>
