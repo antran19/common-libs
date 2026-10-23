@@ -80,10 +80,12 @@ class NexusKafkaAutoConfigurationTest {
     // The topic is checked before Kafka is touched, so a typo is a clear 404, not a hang or a read
     // of some unrelated topic.
     @Test
-    @SuppressWarnings("unchecked")
     void skip_ofAnUnknownTopic_isRefusedBeforeKafkaIsTouched() {
+        // A real, empty provider (no listener registry) instead of a Mockito mock: this module has no
+        // byte-buddy agent configured, and Mockito cannot attach itself on the CI runners.
         org.springframework.beans.factory.ObjectProvider<org.springframework.kafka.config.KafkaListenerEndpointRegistry> none =
-                org.mockito.Mockito.mock(org.springframework.beans.factory.ObjectProvider.class);
+                new org.springframework.beans.factory.support.StaticListableBeanFactory()
+                        .getBeanProvider(org.springframework.kafka.config.KafkaListenerEndpointRegistry.class);
         DeadLetterService service = new DeadLetterService(null, none, "test-service");
 
         assertThatThrownBy(() -> service.skip("auction-events.test-service.DLT", 1))
