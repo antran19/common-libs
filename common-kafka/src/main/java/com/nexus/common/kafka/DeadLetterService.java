@@ -1,5 +1,6 @@
 package com.nexus.common.kafka;
 
+import com.nexus.common.core.exception.NotFoundException;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -55,6 +56,9 @@ public class DeadLetterService {
     }
 
     public record ReplayResult(int replayed, Failure failure) {
+    }
+
+    public record SkipResult(String deadLetterTopic, List<DeadLetter> skipped) {
     }
 
     String replayGroupId() {
@@ -141,6 +145,55 @@ public class DeadLetterService {
         }
         log.info("DLT replay finished: {} record(s) replayed", replayed);
         return new ReplayResult(replayed, null);
+    }
+
+    // Moves the "already handled" pointer of a DLT past its oldest N waiting records WITHOUT
+    // processing them. This is the way out when a record can never be processed (a broken payload):
+    // replay stops at it every time, so everything behind it would wait for ever. The records stay
+    // in the DLT topic (only this service's pointer moves), and each one is written to the log
+    // with its payload, so the decision to drop it can be audited.
+    public synchronized SkipResult skip(String deadLetterTopic, int max) {
+        String source = sourceTopicOf(deadLetterTopic);
+        List<DeadLetter> skipped = new ArrayList<>();
+        if (max < 1) {
+            return new SkipResult(deadLetterTopic, skipped);
+        }
+        try (Consumer<String, String> consumer = newConsumer()) {
+            List<TopicPartition> partitions = partitions(consumer, deadLetterTopic);
+            if (partitions.isEmpty()) {
+                return new SkipResult(deadLetterTopic, skipped);
+            }
+            seekToFirstWaiting(consumer, partitions);
+            Map<TopicPartition, Long> end = consumer.endOffsets(partitions);
+            int emptyPolls = 0;
+            while (skipped.size() < max && !caughtUp(consumer, partitions, end) && emptyPolls < MAX_EMPTY_POLLS) {
+                var records = consumer.poll(Duration.ofMillis(500));
+                emptyPolls = records.isEmpty() ? emptyPolls + 1 : 0;
+                for (ConsumerRecord<String, String> record : records) {
+                    if (skipped.size() >= max) {
+                        break;
+                    }
+                    DeadLetter dropped = toDeadLetter(source, record);
+                    log.warn("DLT skip: dropping {}-{}@{} without processing. error={} payload={}",
+                            deadLetterTopic, record.partition(), record.offset(), dropped.error(), dropped.payload());
+                    consumer.commitSync(Map.of(new TopicPartition(record.topic(), record.partition()),
+                            new OffsetAndMetadata(record.offset() + 1)));
+                    skipped.add(dropped);
+                }
+            }
+        }
+        return new SkipResult(deadLetterTopic, skipped);
+    }
+
+    // Only this service's own dead-letter topics can be skipped; anything else is a typo.
+    private String sourceTopicOf(String deadLetterTopic) {
+        for (String source : listenersBySourceTopic().keySet()) {
+            if (DeadLetterTopics.forSource(source, applicationName).equals(deadLetterTopic)) {
+                return source;
+            }
+        }
+        throw new NotFoundException("DEAD_LETTER_TOPIC_NOT_FOUND",
+                "This service has no dead-letter topic named " + deadLetterTopic);
     }
 
     // Source topic -> the listener (Spring's adapter around the @KafkaListener method).

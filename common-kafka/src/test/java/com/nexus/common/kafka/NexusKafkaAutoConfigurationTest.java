@@ -76,4 +76,18 @@ class NexusKafkaAutoConfigurationTest {
 
         assertThat(DeadLetterService.rootMessage(wrapped)).isEqualTo("IllegalStateException: db down");
     }
+
+    // The topic is checked before Kafka is touched, so a typo is a clear 404, not a hang or a read
+    // of some unrelated topic.
+    @Test
+    @SuppressWarnings("unchecked")
+    void skip_ofAnUnknownTopic_isRefusedBeforeKafkaIsTouched() {
+        org.springframework.beans.factory.ObjectProvider<org.springframework.kafka.config.KafkaListenerEndpointRegistry> none =
+                org.mockito.Mockito.mock(org.springframework.beans.factory.ObjectProvider.class);
+        DeadLetterService service = new DeadLetterService(null, none, "test-service");
+
+        assertThatThrownBy(() -> service.skip("auction-events.test-service.DLT", 1))
+                .isInstanceOf(com.nexus.common.core.exception.NotFoundException.class)
+                .hasMessageContaining("auction-events.test-service.DLT");
+    }
 }

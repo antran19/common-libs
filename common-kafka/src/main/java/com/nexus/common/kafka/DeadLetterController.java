@@ -46,6 +46,15 @@ public class DeadLetterController {
         return ResponseEntity.ok(ApiResponse.ok(service().replay(Math.max(1, Math.min(max, 1000)))));
     }
 
+    // For a record that can never be processed and keeps stopping /replay. It stays in the topic;
+    // only the "handled" pointer moves, and the dropped payload is logged (see DeadLetterService.skip).
+    @RequiresPrivilege(PRIVILEGE)
+    @PostMapping("/skip")
+    public ResponseEntity<ApiResponse<DeadLetterService.SkipResult>> skip(
+            @RequestParam String topic, @RequestParam(defaultValue = "1") int count) {
+        return ResponseEntity.ok(ApiResponse.ok(service().skip(topic, Math.max(1, Math.min(count, 100)))));
+    }
+
     private DeadLetterService service() {
         DeadLetterService service = deadLetterService.getIfAvailable();
         if (service == null) {
